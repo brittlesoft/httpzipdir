@@ -87,7 +87,7 @@ func makehandler(prefix, root string) func(echo.Context) error {
 }
 
 func main() {
-	prefix2root := flag.StringToString("allow", nil, "Add an allowed url prefix->docroot mapping. e.g /media/patate:/path/to/media/patate")
+	prefix2root := flag.StringToString("allow", nil, "Add an allowed url prefix->docroot mapping. e.g /media/patate/url=/path/to/media/patate")
 	listen := flag.String("listen", "127.0.0.1", "Listen address")
 	port := flag.Int("port", 10666, "Listen port")
 
