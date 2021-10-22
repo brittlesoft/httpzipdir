@@ -1,6 +1,6 @@
 OUTDIR=build/
 
-build:
+build: *.go
 	go build -o ${OUTDIR}
 
 run:
