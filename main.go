@@ -24,6 +24,7 @@ func notfound(c echo.Context) error {
 	c.String(http.StatusNotFound, "Not Found")
 	return nil
 }
+
 func makehandler(prefix, root string) func(echo.Context) error {
 
 	handler := func(c echo.Context) error {
@@ -33,15 +34,15 @@ func makehandler(prefix, root string) func(echo.Context) error {
 		if !strings.HasSuffix(urlpath, ".zip") {
 			return notfound(c)
 		}
-
 		urlpath = strings.TrimSuffix(urlpath, ".zip")
 
+		// Resolve urlpath to a path under root
 		urlpathnoprefix := strings.TrimPrefix(urlpath, prefix)
-		log.Printf("urlpathnoprefix: %s\n", urlpathnoprefix)
 		if len(urlpathnoprefix) == 0 || urlpathnoprefix == "/" {
 			return notfound(c)
 		}
-		realreqpath := root + "/" + urlpathnoprefix
+		realreqpath := path.Join(root, urlpathnoprefix)
+		//log.Printf("prefix: %s urlpath: %s urlpathnoprefix: %s realreqpath: %s\n", prefix, urlpath, urlpathnoprefix, realreqpath)
 
 		stat, err := os.Stat(realreqpath)
 		if err != nil || !stat.IsDir() {
@@ -58,17 +59,19 @@ func makehandler(prefix, root string) func(echo.Context) error {
 
 		// Walk directory.
 		filepath.Walk(realreqpath, func(p string, info os.FileInfo, err error) error {
-			if info.IsDir() {
-				// XXX add support for subdirectories,  also handle symlinks
+			if !info.Mode().IsRegular() {
+				// skip dirs, synlinks, devices, etc...
 				return nil
 			}
 
-			fmt.Printf("path: %s\n", p)
-
-			// XXX with subdir support this will have to change
-			ze, err := zw.CreateHeader(&zip.FileHeader{Name: path.Base(p), Method: 0, Modified: info.ModTime()})
+			// Entries in the zipfile will be rooted below the requested dirname
+			// e.g URL:/tmp/testdir.zip -> ZIP:testdir/file_a testdir/dir1/file_b
+			relativep := strings.TrimPrefix(p, realreqpath)
+			relativep = strings.TrimLeft(relativep, "/")
+			//log.Printf("relativep: %s\n", relativep)
+			ze, err := zw.CreateHeader(&zip.FileHeader{Name: relativep, Method: 0, Modified: info.ModTime()})
 			if err != nil {
-				return fmt.Errorf("Failed for %p: %s", err)
+				return fmt.Errorf("Failed for %s: %s", p, err)
 			}
 			file, err := os.Open(p)
 			if err != nil {
@@ -84,6 +87,31 @@ func makehandler(prefix, root string) func(echo.Context) error {
 	}
 
 	return handler
+}
+
+func SetupHandlers(e *echo.Echo, prefix2root *map[string]string) *echo.Echo {
+	for prefix, root := range *prefix2root {
+		if !strings.HasPrefix(prefix, "/") {
+			log.Fatalf("Invalid prefix, must start with a slash (/): %s\n", prefix)
+		}
+
+		// resolve root to an absolute path and make sure it exists
+		root, err := filepath.Abs(root)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if _, err := os.Stat(root); err != nil {
+			log.Fatal(err)
+		}
+
+		cp := path.Clean(prefix)
+		cpany := path.Join(cp, "*")
+		log.Printf("Adding allowed prefix: %s -> %s\n", cpany, root)
+		e.GET(cpany, makehandler(cp, root))
+	}
+	e.Any("*", notfound)
+
+	return e
 }
 
 func main() {
@@ -110,12 +138,7 @@ func main() {
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 
-	for prefix, root := range *prefix2root {
-		cp := path.Clean(prefix)
-		cpany := cp + "/*"
-		log.Printf("Adding allowed prefix: %s -> %s\n", cpany, root)
-		e.GET(cpany, makehandler(cp, root))
-	}
+	e = SetupHandlers(e, prefix2root)
 	e.Logger.Fatal(e.Start(*listen + ":" + strconv.Itoa(*port)))
 
 }
