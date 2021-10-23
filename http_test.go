@@ -18,16 +18,25 @@ var testdirFilenames = []string{"directory/carottes", "directory/patates", "pata
 func TestGetInvalid(t *testing.T) {
 	e := echo.New()
 	e = SetupHandlers(e, &defaultP2R)
-	for _, p := range []string{"/", "/notfound", "/test", "/testdata", "/test/testdir", "/test/.zip", "/test.zip"} {
-		req := httptest.NewRequest(http.MethodGet, p, nil)
-		rec := httptest.NewRecorder()
-		c := e.NewContext(req, rec)
-		e.Router().Find(req.Method, req.URL.Path, c)
-		c.Handler()(c)
-		assert.Equal(t, http.StatusNotFound, rec.Code)
+	for _, p := range []string{
+		"/",
+		"/notfound",
+		"/testdata",
+		"/test.zip",
+		"/test/testdir/.hidden",
+		"/test/testdir/symlink"} {
+		t.Run("GET "+p, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, p, nil)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			e.Router().Find(req.Method, req.URL.Path, c)
+			c.Handler()(c)
+			assert.Equal(t, http.StatusNotFound, rec.Code)
+		})
 	}
 }
 
+// TODO: add test for dirlisting
 func TestGetZip(t *testing.T) {
 	e := echo.New()
 	e = SetupHandlers(e, &defaultP2R)
