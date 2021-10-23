@@ -11,9 +11,11 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"log"
 
+	"github.com/Masterminds/sprig"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/bytes"
@@ -35,7 +37,9 @@ func NewHttpExport(root, baseURL string, autoindex, dirzip bool) (he *HttpExport
 		return he, fmt.Errorf("Invalid options: both autoindex and dirzip are off")
 	}
 
-	t, err := template.New("dirlist").Funcs(template.FuncMap{"PathJoin": path.Join}).Parse(dirlistTemplate)
+	t := template.New("dirlist").Funcs(template.FuncMap{"PathJoin": path.Join})
+	t = t.Funcs(sprig.FuncMap())
+	t, err = t.Parse(dirlistTemplate)
 	if err != nil {
 		return nil, err
 	}
@@ -112,10 +116,11 @@ func (he *HttpExport) dirList(c echo.Context, reqpath string) (err error) {
 		}
 
 		data.Files = append(data.Files, struct {
-			Name string
-			Dir  bool
-			Size string
-		}{f.Name(), f.IsDir(), bytes.Format(info.Size())})
+			Name    string
+			Dir     bool
+			ModTime time.Time
+			Size    string
+		}{f.Name(), f.IsDir(), info.ModTime(), bytes.Format(info.Size())})
 	}
 	return he.indexTemplate.Execute(res, data)
 }

@@ -6,68 +6,44 @@ const dirlistTemplate = `
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="X-UA-Compatible" content="ie=edge">
   <title>{{ .DirName }}</title>
-  <style>
-    body {
-		font-family: monospace;
-		padding: 48px;
-	}
-	header {
-		padding: 4px 16px;
-		font-size: 24px;
-	}
-    ul {
-			list-style-type: none;
-			margin: 0;
-			padding: 20px 0 0 0;
-			display: flex;
-			flex-wrap: wrap;
-    }
-    li {
-			width: 300px;
-			padding: 16px;
-		}
-		li a {
-			display: block;
-			overflow: hidden;
-			white-space: nowrap;
-			text-overflow: ellipsis;
-			text-decoration: none;
-			transition: opacity 0.25s;
-		}
-		li span {
-			color: #707070;
-			font-size: 12px;
-		}
-		li a:hover {
-			opacity: 0.50;
-		}
-		.dir {
-			color: #E91E63;
-		}
-		.file {
-			color: #673AB7;
-		}
+  <style type="text/css">
+  	body { background-color: #F5F5F5; }
+  	h2#title { margin-bottom: 12px; }
+  	a, a:active { text-decoration: none; color: blue; }
+  	a:visited { color: #48468F; }
+  	a:hover, a:focus { text-decoration: underline; color: red; }
+  	table { margin-left: 12px; }
+  	th, td { font: 90% monospace; text-align: left; }
+  	th { font-weight: bold; padding-right: 14px; padding-bottom: 3px; }
+  	td { padding-right: 14px; }
+  	td.size, th#size { text-align: right; }
+  	#dirlist { background-color: white; border-top: 1px solid #646464; border-bottom: 1px solid #646464; padding-top: 10px; padding-bottom: 14px; }
+  	div#footer { font: 90% monospace; color: #787878; padding-top: 4px; }
+  	a.sortheader { color: black; text-decoration: none; display: block; }
+  	span.sortarrow { text-decoration: none; }
   </style>
 </head>
 <body>
-	<header>
-		{{ .DirName }}
-	</header>
-	<ul>
-		{{ range .Files }}
-		<li>
-		{{ if .Dir }}
-			{{ $name := print .Name "/" }}
-			<a class="dir" href="{{PathJoin $.DirName $name }}">{{ $name }}</a>
-		{{ else }}
-			<a class="file" href="{{ $.DirName }}/{{.Name }}">{{ .Name }}</a>
-			<span>{{ .Size }}</span>
-		{{ end }}
-		</li>
-		{{ end }}
-  </ul>
+	<h2 id="title">Index of {{ .DirName}}</h2>
+	<div id="dirlist">
+		<table summary="Directory Listing" cellpadding="0" cellspacing="0" class="sort">
+			<thead><tr><th id="name">Name:</th><th id="modified" class="int">Last Modified:</th><th id="size" class="int">Size:</th></tr></thead>
+			<tbody>
+			<tr><td><a href="../">Parent Directory</a></td><td class="modified" val="0"></td><td class="size" val="0">-</td></tr>
+			{{ range .Files }}
+			  {{ $modtime := .ModTime | date "2006-01-02 15:04:05 -0700" }}
+			  {{ if .Dir }}
+			  {{ $name := print .Name "/" }}
+			  <tr><td><a href="{{PathJoin $.DirName $name }}">{{ $name }}</a></td><td class="modified" val="{{ .ModTime | unixEpoch}}">{{$modtime}}</td><td class="size" val="0">-</td></tr>
+			  <tr><td><a href="{{PathJoin $.DirName .Name }}.zip">{{ .Name }}.zip</a></td><td class="modified" val="{{ .ModTime | unixEpoch}}">{{$modtime}}</td><td class="size" val="0">?</td></tr>
+			  {{ else }}
+			  <tr><td><a href="{{PathJoin $.DirName .Name }}">{{ .Name }}</a></td><td class="modified" val="{{ .ModTime | unixEpoch}}">{{$modtime}}</td><td class="size" val="0">{{.Size}}</td></tr>
+			  {{ end }}
+			  {{end}}
+			</tbody>
+		</table>
+	</div>
 </body>
 </html>
 `
