@@ -1,7 +1,6 @@
 package main
 
-const dirlistTemplate = `
-<!DOCTYPE html>
+const dirlistTemplate = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -30,19 +29,19 @@ const dirlistTemplate = `
 		<table summary="Directory Listing" cellpadding="0" cellspacing="0" class="sort">
 			<thead><tr><th id="name">Name:</th><th id="modified" class="int">Last Modified:</th><th id="size" class="int">Size:</th></tr></thead>
 			<tbody>
-			{{ if ne .DirName "/" }}
+			{{- if ne .DirName "/" }}
 			<tr><td><a href="../">Parent Directory</a></td><td class="modified" val="0"></td><td class="size" val="0">-</td></tr>
-			{{ end }}
-			{{ range .Files }}
-			  {{ $modtime := .ModTime | date "2006-01-02 15:04:05 -0700" }}
-			  {{ if .Dir }}
-			  {{ $name := print .Name "/" }}
+			{{- end }}
+			{{- range .Files }}
+			  {{- $modtime := .ModTime | date "2006-01-02 15:04:05 -0700" }}
+			  {{- if .Dir }}
+			  {{- $name := print .Name "/" }}
 			  <tr><td><a href="{{PathJoin $.DirName $name }}/">{{ $name }}</a></td><td class="modified" val="{{ .ModTime | unixEpoch}}">{{$modtime}}</td><td class="size" val="0">-</td></tr>
 			  <tr><td><a href="{{PathJoin $.DirName .Name }}.zip">{{ .Name }}.zip</a></td><td class="modified" val="{{ .ModTime | unixEpoch}}">{{$modtime}}</td><td class="size" val="0">?</td></tr>
-			  {{ else }}
+			  {{- else }}
 			  <tr><td><a href="{{PathJoin $.DirName .Name }}">{{ .Name }}</a></td><td class="modified" val="{{ .ModTime | unixEpoch}}">{{$modtime}}</td><td class="size" val="0">{{.Size}}</td></tr>
-			  {{ end }}
-			  {{end}}
+			  {{- end }}
+			  {{- end}}
 			</tbody>
 		</table>
 	</div>
