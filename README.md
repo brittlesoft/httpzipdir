@@ -8,6 +8,8 @@ However, for each subdirectory, it adds a "dynamic" `subdirectory.zip` file in t
 When such a file is requested, `httpdirzip` will stream the content of the subdirectory as a zipfile to
 the client.
 
+The index template was lifted mostly verbatim from the output of lighttpd's dirlisting module.
+
 # Usage
 
 ```
