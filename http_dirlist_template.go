@@ -30,7 +30,9 @@ const dirlistTemplate = `
 		<table summary="Directory Listing" cellpadding="0" cellspacing="0" class="sort">
 			<thead><tr><th id="name">Name:</th><th id="modified" class="int">Last Modified:</th><th id="size" class="int">Size:</th></tr></thead>
 			<tbody>
+			{{ if ne .DirName "/" }}
 			<tr><td><a href="../">Parent Directory</a></td><td class="modified" val="0"></td><td class="size" val="0">-</td></tr>
+			{{ end }}
 			{{ range .Files }}
 			  {{ $modtime := .ModTime | date "2006-01-02 15:04:05 -0700" }}
 			  {{ if .Dir }}

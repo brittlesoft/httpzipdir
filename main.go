@@ -54,7 +54,7 @@ func (he *HttpExport) HttpHandler(c echo.Context) (err error) {
 	urlpath := path.Clean(r.URL.Path)
 	urlpathnoprefix := strings.TrimPrefix(urlpath, he.BaseURL)
 	realreqpath := path.Join(he.Root, urlpathnoprefix)
-	//log.Printf("prefix: %s urlpath: %s urlpathnoprefix: %s realreqpath: %s\n", prefix, urlpath, urlpathnoprefix, realreqpath)
+	//log.Printf("prefix: %s urlpath: %s urlpathnoprefix: %s realreqpath: %s\n", he.BaseURL, urlpath, urlpathnoprefix, realreqpath)
 
 	stat, err := os.Stat(realreqpath)
 	switch {
@@ -182,6 +182,7 @@ func notfound(c echo.Context) error {
 }
 
 func SetupHandlers(e *echo.Echo, prefix2root *map[string]string) *echo.Echo {
+	e.Any("*", notfound)
 	for prefix, root := range *prefix2root {
 		if !strings.HasPrefix(prefix, "/") {
 			log.Fatalf("Invalid prefix, must start with a slash (/): %s\n", prefix)
@@ -208,7 +209,6 @@ func SetupHandlers(e *echo.Echo, prefix2root *map[string]string) *echo.Echo {
 		log.Printf("Adding allowed prefix: %s -> %s\n", cp, root)
 		e.GET(cp, export.HttpHandler)
 	}
-	e.Any("*", notfound)
 
 	return e
 }
