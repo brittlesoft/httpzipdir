@@ -77,6 +77,13 @@ func (he *HttpExport) HttpHandler(c echo.Context) (err error) {
 	case stat.Mode().IsRegular():
 		he.serveFile(c, stat, realreqpath)
 	case he.AutoIndex && stat.Mode().IsDir():
+		// Make sure GETs on directories end with a salt otherwise
+		// Parent Directory link won't work as expected.
+		// can't use urlpath here, path.Clean strips trailing slashes
+		if !strings.HasSuffix(r.URL.Path, "/") {
+			return c.Redirect(http.StatusMovedPermanently, urlpath+"/")
+		}
+
 		return he.dirList(c, realreqpath)
 	default:
 		return notfound(c)
@@ -129,14 +136,8 @@ func (he *HttpExport) serveFile(c echo.Context, info os.FileInfo, reqpath string
 	if strings.HasPrefix(path.Base(reqpath), ".") {
 		return notfound(c)
 	}
-	f, err := os.Open(reqpath)
-	if err != nil {
-		log.Printf("Failed to open %s: %s", reqpath, err)
-		return notfound(c)
-	}
-	defer f.Close()
-	http.ServeContent(c.Response(), c.Request(), info.Name(), info.ModTime(), f)
-	return err
+
+	return c.File(reqpath)
 }
 
 func (he *HttpExport) handleZipDir(c echo.Context, reqpath string) (err error) {
@@ -177,8 +178,7 @@ func (he *HttpExport) handleZipDir(c echo.Context, reqpath string) (err error) {
 }
 
 func notfound(c echo.Context) error {
-	c.String(http.StatusNotFound, "Not Found")
-	return nil
+	return c.String(http.StatusNotFound, "Not Found")
 }
 
 func SetupHandlers(e *echo.Echo, prefix2root *map[string]string) *echo.Echo {
