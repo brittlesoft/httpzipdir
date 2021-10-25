@@ -242,6 +242,7 @@ func main() {
 	e.HideBanner = true
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
+	e.IPExtractor = echo.ExtractIPFromRealIPHeader()
 
 	e = SetupHandlers(e, prefix2root)
 	e.Logger.Fatal(e.Start(*listen + ":" + strconv.Itoa(*port)))
