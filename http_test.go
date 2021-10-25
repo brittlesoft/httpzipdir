@@ -13,7 +13,7 @@ import (
 )
 
 var defaultP2R = map[string]string{"/test": "testdata/"}
-var testdirFilenames = []string{"directory/carottes", "directory/patates", "patates"}
+var testdirFilenames = []string{"directory/carottes", "directory/patates", "patates", "zipfile.zip"}
 
 func TestGetInvalid(t *testing.T) {
 	e := echo.New()
@@ -36,7 +36,6 @@ func TestGetInvalid(t *testing.T) {
 	}
 }
 
-// TODO: add test for dirlisting
 func TestGetZip(t *testing.T) {
 	e := echo.New()
 	e = SetupHandlers(e, &defaultP2R)
@@ -61,4 +60,54 @@ func TestGetZip(t *testing.T) {
 		assert.Equal(t, testdirFilenames[i], f.Name)
 	}
 
+}
+
+// dir with zipfile named like the directory (dir vs dir.zip)
+// Requests for dir.zip should return the file and not the dynamically zipped directory
+func TestGetDirWithZip(t *testing.T) {
+	e := echo.New()
+	e = SetupHandlers(e, &defaultP2R)
+	req := httptest.NewRequest(http.MethodGet, "/test/dir_with_zip/dir.zip", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	e.Router().Find(req.Method, req.URL.Path, c)
+	c.Handler()(c)
+	resp := rec.Result()
+
+	body, _ := io.ReadAll(resp.Body)
+	z, err := zip.NewReader(bytes.NewReader(body), int64(len(body)))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dirZipFiles := []string{"1", "2", "3", "4"}
+	for i, f := range z.File {
+		assert.Equal(t, dirZipFiles[i], f.Name)
+	}
+}
+
+func TestGetDirNoSlash(t *testing.T) {
+	e := echo.New()
+	e = SetupHandlers(e, &defaultP2R)
+	req := httptest.NewRequest(http.MethodGet, "/test/testdir", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	e.Router().Find(req.Method, req.URL.Path, c)
+	c.Handler()(c)
+	resp := rec.Result()
+
+	assert.Equal(t, http.StatusMovedPermanently, rec.Code)
+	assert.Equal(t, "/test/testdir/", resp.Header.Get("Location"))
+}
+
+func TestGetDir(t *testing.T) {
+	e := echo.New()
+	e = SetupHandlers(e, &defaultP2R)
+	req := httptest.NewRequest(http.MethodGet, "/test/testdir/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	e.Router().Find(req.Method, req.URL.Path, c)
+	c.Handler()(c)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
 }
