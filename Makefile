@@ -9,6 +9,8 @@ VERSION ?= $(shell \
         echo `whoami`-`git rev-parse --abbrev-ref HEAD`-${GIT_REV}-$(NOW) | sed 's/[^0-9a-zA-Z_\.-]/_/g'; \
 	fi)
 
+all: test build
+
 build:
 	go build -o ${OUTDIR} -ldflags "-X main.VERSION=${VERSION}"
 
@@ -18,5 +20,6 @@ run:
 
 test:
 	go test
+
 
 .PHONY: build test run
