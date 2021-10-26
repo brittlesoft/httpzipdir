@@ -10,6 +10,10 @@ the client.
 
 The index template was lifted mostly verbatim from the output of lighttpd's dirlisting module.
 
+# Demo
+
+<https://raby.sh/demos/httpzipdir>
+
 # Usage
 
 ```
