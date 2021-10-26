@@ -111,3 +111,29 @@ func TestGetDir(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
+
+func TestGetDotFile(t *testing.T) {
+	e := echo.New()
+	e = SetupHandlers(e, &defaultP2R)
+	req := httptest.NewRequest(http.MethodGet, "/test/testdir/.hidden", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	e.Router().Find(req.Method, req.URL.Path, c)
+	c.Handler()(c)
+
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
+func TestGetRegularFile(t *testing.T) {
+	e := echo.New()
+	e = SetupHandlers(e, &defaultP2R)
+	req := httptest.NewRequest(http.MethodGet, "/test/testdir/patates", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	e.Router().Find(req.Method, req.URL.Path, c)
+	c.Handler()(c)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	body, _ := io.ReadAll(rec.Result().Body)
+	assert.Equal(t, body, []byte("des patates\n"))
+}
