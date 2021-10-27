@@ -11,6 +11,7 @@ require (
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/labstack/echo/v4 v4.6.1
 	github.com/labstack/gommon v0.3.0 // indirect
+	github.com/landlock-lsm/go-landlock v0.0.0-20211021163222-0c5bdbbc53ca // indirect
 	github.com/mattn/go-colorable v0.1.11 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect

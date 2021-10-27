@@ -19,6 +19,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/bytes"
+	"github.com/landlock-lsm/go-landlock/landlock"
 	flag "github.com/spf13/pflag"
 )
 
@@ -218,6 +219,7 @@ func main() {
 	listen := flag.String("listen", "127.0.0.1", "Listen address")
 	port := flag.Int("port", 10666, "Listen port")
 	version := flag.Bool("version", false, "Show version and exit")
+	landlocked := flag.Bool("landlocked", true, "Failure to restrict access to docroots using landlock(7) is fatal")
 
 	flag.Parse()
 
@@ -236,7 +238,21 @@ func main() {
 		log.Fatalf("Invalid port: %d\n", *port)
 	}
 
-	log.Printf("Listening On: %s:%d\n", *listen, *port)
+	roots := []string{}
+	for _, root := range *prefix2root {
+		roots = append(roots, root)
+	}
+	err := landlock.V1.RestrictPaths(
+		landlock.RODirs(roots...),
+	)
+	if err != nil {
+		msg := fmt.Sprintf("Failed landlock for %s: %s\n", roots, err)
+		if *landlocked {
+			log.Fatal(msg)
+		} else {
+			log.Printf(msg)
+		}
+	}
 
 	e := echo.New()
 	e.HideBanner = true
@@ -245,6 +261,8 @@ func main() {
 	e.IPExtractor = echo.ExtractIPFromRealIPHeader()
 
 	e = SetupHandlers(e, prefix2root)
+
+	log.Printf("Listening On: %s:%d\n", *listen, *port)
 	e.Logger.Fatal(e.Start(*listen + ":" + strconv.Itoa(*port)))
 
 }

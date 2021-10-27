@@ -12,7 +12,7 @@ VERSION ?= $(shell \
 all: test build
 
 build:
-	go build -o ${OUTDIR} -ldflags "-X main.VERSION=${VERSION}"
+	CGO_ENABLED=0 go build -o ${OUTDIR} -ldflags "-X main.VERSION=${VERSION}"
 
 run:
 	go run
