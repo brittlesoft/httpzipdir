@@ -252,6 +252,8 @@ func main() {
 		} else {
 			log.Printf(msg)
 		}
+	} else {
+		log.Printf("Landlock successful for %s", roots)
 	}
 
 	e := echo.New()
