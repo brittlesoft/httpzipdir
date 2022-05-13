@@ -3,6 +3,7 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -17,7 +18,7 @@ var testdirFilenames = []string{"directory/carottes", "directory/patates", "pata
 
 func TestGetInvalid(t *testing.T) {
 	e := echo.New()
-	e = SetupHandlers(e, &defaultP2R)
+	e, _, _ = SetupHandlers(e, &defaultP2R)
 	for _, p := range []string{
 		"/",
 		"/notfound",
@@ -38,7 +39,7 @@ func TestGetInvalid(t *testing.T) {
 
 func TestGetZip(t *testing.T) {
 	e := echo.New()
-	e = SetupHandlers(e, &defaultP2R)
+	e, _, _ = SetupHandlers(e, &defaultP2R)
 	req := httptest.NewRequest(http.MethodGet, "/test/testdir.zip", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
@@ -66,7 +67,7 @@ func TestGetZip(t *testing.T) {
 // Requests for dir.zip should return the file and not the dynamically zipped directory
 func TestGetDirWithZip(t *testing.T) {
 	e := echo.New()
-	e = SetupHandlers(e, &defaultP2R)
+	e, _, _ = SetupHandlers(e, &defaultP2R)
 	req := httptest.NewRequest(http.MethodGet, "/test/dir_with_zip/dir.zip", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
@@ -88,7 +89,7 @@ func TestGetDirWithZip(t *testing.T) {
 
 func TestGetDirNoSlash(t *testing.T) {
 	e := echo.New()
-	e = SetupHandlers(e, &defaultP2R)
+	e, _, _ = SetupHandlers(e, &defaultP2R)
 	req := httptest.NewRequest(http.MethodGet, "/test/testdir", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
@@ -102,7 +103,7 @@ func TestGetDirNoSlash(t *testing.T) {
 
 func TestGetDir(t *testing.T) {
 	e := echo.New()
-	e = SetupHandlers(e, &defaultP2R)
+	e, _, _ = SetupHandlers(e, &defaultP2R)
 	req := httptest.NewRequest(http.MethodGet, "/test/testdir/", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
@@ -114,7 +115,7 @@ func TestGetDir(t *testing.T) {
 
 func TestGetDotFile(t *testing.T) {
 	e := echo.New()
-	e = SetupHandlers(e, &defaultP2R)
+	e, _, _ = SetupHandlers(e, &defaultP2R)
 	req := httptest.NewRequest(http.MethodGet, "/test/testdir/.hidden", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
@@ -126,7 +127,7 @@ func TestGetDotFile(t *testing.T) {
 
 func TestGetRegularFile(t *testing.T) {
 	e := echo.New()
-	e = SetupHandlers(e, &defaultP2R)
+	e, _, _ = SetupHandlers(e, &defaultP2R)
 	req := httptest.NewRequest(http.MethodGet, "/test/testdir/patates", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
@@ -136,4 +137,69 @@ func TestGetRegularFile(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 	body, _ := io.ReadAll(rec.Result().Body)
 	assert.Equal(t, body, []byte("des patates\n"))
+}
+
+func TestInvalidOpts(t *testing.T) {
+	e := echo.New()
+	for _, opt := range []string{
+		"",
+		"invalid",
+		"invalid1,invalid2",
+		"noautoindex,invalid"} {
+		t.Run("invalid opt: "+opt, func(t *testing.T) {
+			_, _, err := SetupHandlers(e, &map[string]string{"/test": "testdata/:" + opt})
+			assert.NotNil(t, err)
+		})
+	}
+}
+
+func TestNoAutoIndex(t *testing.T) {
+	e := echo.New()
+	e, _, _ = SetupHandlers(e, &map[string]string{"/test": "testdata/:noautoindex"})
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	e.Router().Find(req.Method, req.URL.Path, c)
+	c.Handler()(c)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+
+	req = httptest.NewRequest(http.MethodGet, "/test/testdir/patates", nil)
+	rec = httptest.NewRecorder()
+	c = e.NewContext(req, rec)
+	e.Router().Find(req.Method, req.URL.Path, c)
+	c.Handler()(c)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	body, _ := io.ReadAll(rec.Result().Body)
+	assert.Equal(t, body, []byte("des patates\n"))
+}
+
+func TestNoDirZip(t *testing.T) {
+	e := echo.New()
+	e, _, err := SetupHandlers(e, &map[string]string{"/test": "testdata/:nodirzip"})
+	assert.Nil(t, err)
+	req := httptest.NewRequest(http.MethodGet, "/test/testdir.zip", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	e.Router().Find(req.Method, req.URL.Path, c)
+	c.Handler()(c)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
+func TestNoDirZipNoAutoIndex(t *testing.T) {
+	e := echo.New()
+	e, _, err := SetupHandlers(e, &map[string]string{"/test": "testdata/:nodirzip,noautoindex"})
+	assert.Nil(t, err)
+	for url, expected := range map[string]int{
+		"/test/testdir.zip":     http.StatusNotFound,
+		"/test":                 http.StatusNotFound,
+		"/test/testdir/patates": http.StatusOK} {
+		t.Run(fmt.Sprintf("%s: %d", url, expected), func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, url, nil)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			e.Router().Find(req.Method, req.URL.Path, c)
+			c.Handler()(c)
+			assert.Equal(t, expected, rec.Code)
+		})
+	}
 }

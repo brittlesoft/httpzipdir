@@ -18,9 +18,8 @@ The index template was lifted mostly verbatim from the output of lighttpd's dirl
 
 ```
 Usage of ./build/httpzipdir:
-      --allow stringToString   Add an allowed url prefix->docroot mapping. e.g /media/patate/url=/path/to/media/patate (default [])
+      --allow stringToString   Add an allowed url prefix->docroot:options mapping. e.g /media/patate/url=/path/to/media/patate, /url/path=/path/on/disk:noautoindex. Valid options: noautoindex,nodirzip (default [])
       --listen string          Listen address (default "127.0.0.1")
       --port int               Listen port (default 10666)
       --version                Show version and exit
-```      
-
+```

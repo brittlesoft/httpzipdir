@@ -34,10 +34,6 @@ type HttpExport struct {
 }
 
 func NewHttpExport(root, baseURL string, autoindex, dirzip bool) (he *HttpExport, err error) {
-	if !autoindex && !dirzip {
-		return he, fmt.Errorf("Invalid options: both autoindex and dirzip are off")
-	}
-
 	t := template.New("dirlist").Funcs(template.FuncMap{"PathJoin": path.Join})
 	t = t.Funcs(sprig.FuncMap())
 	t, err = t.Parse(dirlistTemplate)
@@ -78,7 +74,7 @@ func (he *HttpExport) HttpHandler(c echo.Context) (err error) {
 	case stat.Mode().IsRegular():
 		he.serveFile(c, stat, realreqpath)
 	case he.AutoIndex && stat.Mode().IsDir():
-		// Make sure GETs on directories end with a salt otherwise
+		// Make sure GETs on directories end with a slash otherwise
 		// Parent Directory link won't work as expected.
 		// can't use urlpath here, path.Clean strips trailing slashes
 		if !strings.HasSuffix(r.URL.Path, "/") {
@@ -105,9 +101,11 @@ func (he *HttpExport) dirList(c echo.Context, reqpath string) (err error) {
 	res.Header().Set(echo.HeaderContentType, echo.MIMETextHTMLCharsetUTF8)
 	data := struct {
 		DirName string
+		DirZip  bool
 		Files   []interface{}
 	}{
 		DirName: c.Request().URL.Path,
+		DirZip:  he.DirZip,
 	}
 
 	for _, f := range dirents {
@@ -182,27 +180,48 @@ func notfound(c echo.Context) error {
 	return c.String(http.StatusNotFound, "Not Found")
 }
 
-func SetupHandlers(e *echo.Echo, prefix2root *map[string]string) *echo.Echo {
+func SetupHandlers(e *echo.Echo, prefix2rootAndOpts *map[string]string) (*echo.Echo, []*HttpExport, error) {
+	var handlers []*HttpExport
 	e.Any("*", notfound)
-	for prefix, root := range *prefix2root {
+	for prefix, rootAndOpts := range *prefix2rootAndOpts {
+		autoindex := true
+		dirzip := true
 		if !strings.HasPrefix(prefix, "/") {
-			log.Fatalf("Invalid prefix, must start with a slash (/): %s\n", prefix)
+			return e, handlers, fmt.Errorf("Invalid prefix, must start with a slash (/): %s\n", prefix)
+		}
+
+		// root and opt:  root:opt1,opt2,opt3
+		splitted := strings.SplitN(rootAndOpts, ":", 2)
+		root := splitted[0]
+		if len(splitted) > 1 {
+			opts := strings.Split(splitted[1], ",")
+			for i := range opts {
+				switch opts[i] {
+				case "noautoindex":
+					autoindex = false
+				case "nodirzip":
+					dirzip = false
+				default:
+					return e, handlers, fmt.Errorf("Invalid options for root %s: %s", root, opts[i])
+				}
+			}
 		}
 
 		// resolve root to an absolute path and make sure it exists
 		root, err := filepath.Abs(root)
 		if err != nil {
-			log.Fatal(err)
+			return e, handlers, err
 		}
 		if _, err := os.Stat(root); err != nil {
-			log.Fatal(err)
+			return e, handlers, err
 		}
 
 		cp := path.Clean(prefix)
-		export, err := NewHttpExport(root, cp, true, true)
+		export, err := NewHttpExport(root, cp, autoindex, dirzip)
 		if err != nil {
-			log.Fatal(err)
+			return e, handlers, err
 		}
+		handlers = append(handlers, export)
 
 		cpany := path.Join(cp, "*")
 		log.Printf("Adding allowed prefix: %s -> %s\n", cpany, root)
@@ -211,15 +230,21 @@ func SetupHandlers(e *echo.Echo, prefix2root *map[string]string) *echo.Echo {
 		e.GET(cp, export.HttpHandler)
 	}
 
-	return e
+	return e, handlers, nil
 }
 
 func main() {
-	prefix2root := flag.StringToString("allow", nil, "Add an allowed url prefix->docroot mapping. e.g /media/patate/url=/path/to/media/patate")
+	prefix2rootAndOpts := flag.StringToString("allow", nil, "Add an allowed url prefix->docroot:options mapping. e.g /media/patate/url=/path/to/media/patate, /url/path=/path/on/disk:noautoindex. Valid options: noautoindex,nodirzip")
 	listen := flag.String("listen", "127.0.0.1", "Listen address")
 	port := flag.Int("port", 10666, "Listen port")
 	version := flag.Bool("version", false, "Show version and exit")
 	landlocked := flag.Bool("landlocked", true, "Failure to restrict access to docroots using landlock(7) is fatal")
+	landlockBypassTest := flag.Bool("landlockbypasstest", false, "testing only: adds the equivalent of --allow /tmp=/tmp")
+
+	err := flag.CommandLine.MarkHidden("landlockbypasstest")
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	flag.Parse()
 
@@ -228,7 +253,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	if len(*prefix2root) == 0 {
+	if len(*prefix2rootAndOpts) == 0 {
 		flag.Usage()
 		log.Fatal("No configuration. Set --allow")
 	}
@@ -238,11 +263,23 @@ func main() {
 		log.Fatalf("Invalid port: %d\n", *port)
 	}
 
-	roots := []string{}
-	for _, root := range *prefix2root {
-		roots = append(roots, root)
+	e := echo.New()
+	e.HideBanner = true
+	e.Use(middleware.Logger())
+	e.Use(middleware.Recover())
+	e.IPExtractor = echo.ExtractIPFromRealIPHeader()
+
+	e, handlers, err := SetupHandlers(e, prefix2rootAndOpts)
+	if err != nil {
+		log.Fatal(err)
 	}
-	err := landlock.V1.RestrictPaths(
+
+	// landlock
+	roots := []string{}
+	for i := range handlers {
+		roots = append(roots, handlers[i].Root)
+	}
+	err = landlock.V1.RestrictPaths(
 		landlock.RODirs(roots...),
 	)
 	if err != nil {
@@ -256,13 +293,10 @@ func main() {
 		log.Printf("Landlock successful for %s", roots)
 	}
 
-	e := echo.New()
-	e.HideBanner = true
-	e.Use(middleware.Logger())
-	e.Use(middleware.Recover())
-	e.IPExtractor = echo.ExtractIPFromRealIPHeader()
-
-	e = SetupHandlers(e, prefix2root)
+	if *landlockBypassTest {
+		log.Printf("LANDLOCK BYPASS TEST: /tmp is accessible")
+		SetupHandlers(e, &map[string]string{"/tmp": "/tmp"})
+	}
 
 	log.Printf("Listening On: %s:%d\n", *listen, *port)
 	e.Logger.Fatal(e.Start(*listen + ":" + strconv.Itoa(*port)))
