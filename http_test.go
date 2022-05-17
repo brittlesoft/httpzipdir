@@ -81,9 +81,9 @@ func TestGetDirWithZip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dirZipFiles := []string{"1", "2", "3", "4"}
+	zipDirFiles := []string{"1", "2", "3", "4"}
 	for i, f := range z.File {
-		assert.Equal(t, dirZipFiles[i], f.Name)
+		assert.Equal(t, zipDirFiles[i], f.Name)
 	}
 }
 
@@ -173,9 +173,9 @@ func TestNoAutoIndex(t *testing.T) {
 	assert.Equal(t, body, []byte("des patates\n"))
 }
 
-func TestNoDirZip(t *testing.T) {
+func TestNoZipDir(t *testing.T) {
 	e := echo.New()
-	e, _, err := SetupHandlers(e, &map[string]string{"/test": "testdata/:nodirzip"})
+	e, _, err := SetupHandlers(e, &map[string]string{"/test": "testdata/:nozipdir"})
 	assert.Nil(t, err)
 	req := httptest.NewRequest(http.MethodGet, "/test/testdir.zip", nil)
 	rec := httptest.NewRecorder()
@@ -185,9 +185,9 @@ func TestNoDirZip(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, rec.Code)
 }
 
-func TestNoDirZipNoAutoIndex(t *testing.T) {
+func TestNoZipDirNoAutoIndex(t *testing.T) {
 	e := echo.New()
-	e, _, err := SetupHandlers(e, &map[string]string{"/test": "testdata/:nodirzip,noautoindex"})
+	e, _, err := SetupHandlers(e, &map[string]string{"/test": "testdata/:nozipdir,noautoindex"})
 	assert.Nil(t, err)
 	for url, expected := range map[string]int{
 		"/test/testdir.zip":     http.StatusNotFound,

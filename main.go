@@ -29,18 +29,18 @@ type HttpExport struct {
 	Root          string
 	BaseURL       string
 	AutoIndex     bool
-	DirZip        bool
+	ZipDir        bool
 	indexTemplate *template.Template
 }
 
-func NewHttpExport(root, baseURL string, autoindex, dirzip bool) (he *HttpExport, err error) {
+func NewHttpExport(root, baseURL string, autoindex, zipdir bool) (he *HttpExport, err error) {
 	t := template.New("dirlist").Funcs(template.FuncMap{"PathJoin": path.Join})
 	t = t.Funcs(sprig.FuncMap())
 	t, err = t.Parse(dirlistTemplate)
 	if err != nil {
 		return nil, err
 	}
-	he = &HttpExport{root, baseURL, autoindex, dirzip, t}
+	he = &HttpExport{root, baseURL, autoindex, zipdir, t}
 	return he, err
 }
 
@@ -60,7 +60,7 @@ func (he *HttpExport) HttpHandler(c echo.Context) (err error) {
 		// The req file doesn't exist but ends with .zip
 		// if the req file without the zip extension is a directory,
 		// send the directory contents as a zipfile
-		if he.DirZip && strings.HasSuffix(realreqpath, ".zip") {
+		if he.ZipDir && strings.HasSuffix(realreqpath, ".zip") {
 			realreqpath = strings.TrimSuffix(realreqpath, ".zip")
 			stat, err = os.Stat(realreqpath)
 			if err != nil || !stat.IsDir() {
@@ -113,11 +113,11 @@ func (he *HttpExport) dirList(c echo.Context, reqpath string) (err error) {
 	res.Header().Set(echo.HeaderContentType, echo.MIMETextHTMLCharsetUTF8)
 	data := struct {
 		DirName string
-		DirZip  bool
+		ZipDir  bool
 		Files   []interface{}
 	}{
 		DirName: c.Request().URL.Path,
-		DirZip:  he.DirZip,
+		ZipDir:  he.ZipDir,
 	}
 
 	for _, f := range dirents {
@@ -198,7 +198,7 @@ func SetupHandlers(e *echo.Echo, prefix2rootAndOpts *map[string]string) (*echo.E
 	e.Any("*", notfound)
 	for prefix, rootAndOpts := range *prefix2rootAndOpts {
 		autoindex := true
-		dirzip := true
+		zipdir := true
 		if !strings.HasPrefix(prefix, "/") {
 			return e, handlers, fmt.Errorf("Invalid prefix, must start with a slash (/): %s\n", prefix)
 		}
@@ -212,8 +212,8 @@ func SetupHandlers(e *echo.Echo, prefix2rootAndOpts *map[string]string) (*echo.E
 				switch opts[i] {
 				case "noautoindex":
 					autoindex = false
-				case "nodirzip":
-					dirzip = false
+				case "nozipdir":
+					zipdir = false
 				default:
 					return e, handlers, fmt.Errorf("Invalid options for root %s: %s", root, opts[i])
 				}
@@ -230,7 +230,7 @@ func SetupHandlers(e *echo.Echo, prefix2rootAndOpts *map[string]string) (*echo.E
 		}
 
 		cp := path.Clean(prefix)
-		export, err := NewHttpExport(root, cp, autoindex, dirzip)
+		export, err := NewHttpExport(root, cp, autoindex, zipdir)
 		if err != nil {
 			return e, handlers, err
 		}
@@ -247,7 +247,7 @@ func SetupHandlers(e *echo.Echo, prefix2rootAndOpts *map[string]string) (*echo.E
 }
 
 func main() {
-	prefix2rootAndOpts := flag.StringToString("allow", nil, "Add an allowed url prefix->docroot:options mapping. e.g /media/patate/url=/path/to/media/patate, /url/path=/path/on/disk:noautoindex. Valid options: noautoindex,nodirzip")
+	prefix2rootAndOpts := flag.StringToString("allow", nil, "Add an allowed url prefix->docroot:options mapping. e.g /media/patate/url=/path/to/media/patate, /url/path=/path/on/disk:noautoindex. Valid options: noautoindex,nozipdir")
 	listen := flag.String("listen", "127.0.0.1", "Listen address")
 	port := flag.Int("port", 10666, "Listen port")
 	version := flag.Bool("version", false, "Show version and exit")

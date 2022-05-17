@@ -37,7 +37,7 @@ const dirlistTemplate = `<!DOCTYPE html>
 			  {{- if .Dir }}
 			  {{- $name := print .Name "/" }}
 			  <tr><td><a href="{{PathJoin $.DirName $name }}/">{{ $name }}</a></td><td class="modified" val="{{ .ModTime | unixEpoch}}">{{$modtime}}</td><td class="size" val="0">-</td></tr>
-			  {{- if $.DirZip }}
+			  {{- if $.ZipDir }}
 			  <tr><td><a href="{{PathJoin $.DirName .Name }}.zip">{{ .Name }}.zip</a></td><td class="modified" val="{{ .ModTime | unixEpoch}}">{{$modtime}}</td><td class="size" val="0">?</td></tr>
 			  {{- end }}
 			  {{- else }}
