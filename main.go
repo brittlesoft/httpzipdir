@@ -73,15 +73,27 @@ func (he *HttpExport) HttpHandler(c echo.Context) (err error) {
 
 	case stat.Mode().IsRegular():
 		he.serveFile(c, stat, realreqpath)
-	case he.AutoIndex && stat.Mode().IsDir():
+	case stat.Mode().IsDir():
+		// Peek at index.html to avoid leaking existence of directories via http status
+		indexpage := path.Join(realreqpath, "index.html")
+		indexstat, indexerr := os.Stat(indexpage)
+
 		// Make sure GETs on directories end with a slash otherwise
 		// Parent Directory link won't work as expected.
 		// can't use urlpath here, path.Clean strips trailing slashes
-		if !strings.HasSuffix(r.URL.Path, "/") {
+		if !strings.HasSuffix(r.URL.Path, "/") && (indexerr == nil || he.AutoIndex) {
 			return c.Redirect(http.StatusMovedPermanently, urlpath+"/")
 		}
 
-		return he.dirList(c, realreqpath)
+		if indexerr == nil && indexstat.Mode().IsRegular() {
+			return c.File(indexpage)
+		}
+
+		if he.AutoIndex {
+			return he.dirList(c, realreqpath)
+		}
+
+		return notfound(c)
 	default:
 		return notfound(c)
 	}
@@ -152,6 +164,7 @@ func (he *HttpExport) handleZipDir(c echo.Context, reqpath string) (err error) {
 	filepath.Walk(reqpath, func(p string, info os.FileInfo, err error) error {
 		if strings.HasPrefix(path.Base(p), ".") || !info.Mode().IsRegular() {
 			// skip dotfiles, dirs, symlinks, devices, etc...
+			// FIXME: should probably be possible to recurse into subdirs
 			return nil
 		}
 

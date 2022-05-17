@@ -203,3 +203,20 @@ func TestNoDirZipNoAutoIndex(t *testing.T) {
 		})
 	}
 }
+
+func TestIndexHtml(t *testing.T) {
+	e := echo.New()
+	e, _, err := SetupHandlers(e, &defaultP2R)
+	assert.Nil(t, err)
+	req := httptest.NewRequest(http.MethodGet, "/test/dir_with_index/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	e.Router().Find(req.Method, req.URL.Path, c)
+	c.Handler()(c)
+	resp := rec.Result()
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "text/html; charset=utf-8", resp.Header.Get("Content-Type"))
+	body, _ := io.ReadAll(resp.Body)
+	assert.Equal(t, "this is the index file\n", string(body))
+}
